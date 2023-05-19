@@ -1,0 +1,2 @@
+系统调用sysinfo可以通过共享页加速。系统在创建共享页时将sysinfo所需的信息存入，用户只需要读取即可。
+page1: guard page for protect stack by present page0 overflow
