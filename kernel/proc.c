@@ -312,6 +312,9 @@ fork(void)
 
   pid = np->pid;
 
+  //mask carry
+  np->mask = p->mask;
+
   release(&np->lock);
 
   acquire(&wait_lock);
@@ -680,4 +683,22 @@ procdump(void)
     printf("%d %s %s", p->pid, state, p->name);
     printf("\n");
   }
+}
+
+ 
+// get number of proc
+uint64
+nproc(void)
+{
+  uint64 counter = 0;
+  struct proc *p;
+  // 遍历进程控制块，即OS课程中的PCB
+  for(p = proc; p < &proc[NPROC]; p++) { 
+    acquire(&p->lock);
+    if(p->state != UNUSED) {
+      ++counter;
+    }
+    release(&p->lock);
+  }
+  return counter;
 }

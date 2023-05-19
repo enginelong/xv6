@@ -5,6 +5,7 @@
 #include "memlayout.h"
 #include "spinlock.h"
 #include "proc.h"
+#include "sysinfo.h"
 
 uint64
 sys_exit(void)
@@ -90,4 +91,34 @@ sys_uptime(void)
   xticks = ticks;
   release(&tickslock);
   return xticks;
+}
+
+uint64
+sys_trace(void)
+{
+  int mask;
+  // 取 a0 寄存器中的值返回给 mask
+  argint(0, &mask);
+  // 把 mask 传给现有进程的 mask
+  myproc()->mask = mask;
+  return 0;
+}
+
+
+// get sysinfo
+uint64
+sys_sysinfo(void)
+{
+  uint64 info; // user pointer
+  struct sysinfo kinfo;
+  struct proc *p = myproc();
+  
+  argaddr(0, &info);
+
+  kinfo.freemem = freemem();
+  kinfo.nproc = nproc();
+  if(copyout(p->pagetable, info, (char*)&kinfo, sizeof(kinfo)) < 0){
+    return -1;
+  }
+  return 0;
 }
