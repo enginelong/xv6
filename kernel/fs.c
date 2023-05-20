@@ -417,6 +417,37 @@ bmap(struct inode *ip, uint bn)
     return addr;
   }
 
+/* My Code: */
+// （模仿以上结构）
+  // doubly-indirect blocks(267~266+256*256=65802)
+  bn -= NINDIRECT;  //(0~256*256-1)
+
+  if(bn < NINDIRECT * NINDIRECT){
+
+    uint index_1 = bn / NINDIRECT;	// 第几个一级映射表
+    uint index_2 = bn % NINDIRECT;	// 第几个二级映射项
+    
+    if((addr = ip->addrs[NDIRECT+1]) == 0)
+      ip->addrs[NDIRECT+1] = addr = balloc(ip->dev);  // 分配
+    bp = bread(ip->dev, addr);
+    a = (uint*)bp->data;
+    if((addr = a[index_1]) == 0){
+      a[index_1] = addr = balloc(ip->dev);
+      log_write(bp);
+    }
+    brelse(bp);
+
+    bp = bread(ip->dev, addr);	// 继续读取第二级映射目录
+    a = (uint*)bp->data;
+    if((addr = a[index_2]) == 0){
+      a[index_2] = addr = balloc(ip->dev);
+      log_write(bp);
+    }
+    brelse(bp);
+
+    return addr;
+  }
+
   panic("bmap: out of range");
 }
 
@@ -425,9 +456,9 @@ bmap(struct inode *ip, uint bn)
 void
 itrunc(struct inode *ip)
 {
-  int i, j;
-  struct buf *bp;
-  uint *a;
+  int i, j, k;
+  struct buf *bp, *bp_doub;
+  uint *a, *b;
 
   for(i = 0; i < NDIRECT; i++){
     if(ip->addrs[i]){
@@ -447,6 +478,29 @@ itrunc(struct inode *ip)
     bfree(ip->dev, ip->addrs[NDIRECT]);
     ip->addrs[NDIRECT] = 0;
   }
+
+
+  /*My code start*/
+  if(ip->addrs[NDIRECT+1]){
+    bp = bread(ip->dev, ip->addrs[NDIRECT+1]);
+    a = (uint*)bp->data;
+    for (j = 0; j < NINDIRECT; j++){
+      if(a[j]){
+        bp_doub = bread(ip->dev, a[j]);
+        b = (uint*)bp_doub->data;
+        for (k = 0; k<NINDIRECT;k++){
+          if(b[k])
+            bfree(ip->dev, b[k]);
+        }
+        brelse(bp_doub);
+        bfree(ip->dev, a[j]);
+      }
+    }
+    brelse(bp);
+    bfree(ip->dev, ip->addrs[NDIRECT+1]);
+    ip->addrs[NDIRECT+1] = 0;
+  }
+/*My code end*/
 
   ip->size = 0;
   iupdate(ip);
