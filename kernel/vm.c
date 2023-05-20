@@ -308,26 +308,34 @@ uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)
   pte_t *pte;
   uint64 pa, i;
   uint flags;
-  char *mem;
+  //char *mem;
 
+//修改fork使用的uvmcopy()，使其只复制页表，而不复制内存，并清除PTE_W，设置PTE_C。
   for(i = 0; i < sz; i += PGSIZE){
     if((pte = walk(old, i, 0)) == 0)
       panic("uvmcopy: pte should exist");
     if((*pte & PTE_V) == 0)
       panic("uvmcopy: page not present");
     pa = PTE2PA(*pte);
+    //首先更改父进程PTE
+    *pte &= (~PTE_W);//清除PTE_W
+    *pte |= (PTE_C);//设置PTE_C
+    //更改子进程
     flags = PTE_FLAGS(*pte);
-    if((mem = kalloc()) == 0)
-      goto err;
-    memmove(mem, (char*)pa, PGSIZE);
-    if(mappages(new, i, PGSIZE, (uint64)mem, flags) != 0){
-      kfree(mem);
+    //if((mem = kalloc()) == 0)
+      //goto err;
+    //memmove(mem, (char*)pa, PGSIZE);
+    //子进程共享父进程物理页面，将这个页面的引用数加1
+    if(mappages(new, i, PGSIZE, (uint64)pa, flags) != 0){
+      //kfree(mem);
       goto err;
     }
+    add_page_ref((void*)pa);
   }
   return 0;
 
  err:
+  
   uvmunmap(new, 0, i / PGSIZE, 1);
   return -1;
 }
@@ -352,6 +360,40 @@ int
 copyout(pagetable_t pagetable, uint64 dstva, char *src, uint64 len)
 {
   uint64 n, va0, pa0;
+  if(cowcheck(pagetable,dstva))
+  {
+      pte_t *pte = walk(pagetable, dstva, 0);
+      uint64 old_pa=PTE2PA(*pte);
+      if(get_page_ref((void*)old_pa)==1)
+      {
+        *pte |= PTE_W;
+        *pte &= (~PTE_C);
+        //kfree(new_pa);
+      }  
+      else
+      {
+        void* new_pa=kalloc();
+        if(new_pa==0)
+        {
+          return -1;
+        } 
+        else
+        {
+          //复制物理内存
+          memmove(new_pa,(void*)old_pa,PGSIZE);
+          //修改页表，更改PTE中的pa
+          //得到原来PTE中的flag，与新物理地址组合即可。
+          uint flags = PTE_FLAGS(*pte);
+          uint64 new_pte=PA2PTE(new_pa);
+          *pte = new_pte | flags;
+          //设置PTE_W，使该页可写
+          *pte |= PTE_W;
+          *pte &= (~PTE_C);
+          kfree((void*)old_pa);          
+        }
+      }    
+
+  }
 
   while(len > 0){
     va0 = PGROUNDDOWN(dstva);
