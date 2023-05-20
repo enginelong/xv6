@@ -8,5 +8,8 @@ struct buf {
   struct buf *prev; // LRU cache list
   struct buf *next;
   uchar data[BSIZE];
+
+  uint lastuse_time;  // 【上次使用时间的时间戳】
+  int owner;	// 【当前归属的bucket】
 };
 

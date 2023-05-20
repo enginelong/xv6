@@ -21,12 +21,55 @@ struct run {
 struct {
   struct spinlock lock;
   struct run *freelist;
-} kmem;
+} kmem[NCPU]; // 【每个CPU分配一个kmem锁】
+
+#define MAX_NUM_PAGES 100	// 【最大“偷窃”页数设为100】
+
+void * get_others_pages(int cpu){
+  int count = 0;
+  struct run *start = 0;
+  struct run *end = 0;
+  for(int i = 0; i < NCPU; i++){
+    if(i == cpu)
+      continue;
+    
+    acquire(&kmem[i].lock);
+    
+    start = kmem[i].freelist;
+    end = kmem[i].freelist;
+    if(!start){	// 这个CPU也没有空闲内存
+      release(&kmem[i].lock);
+      continue;
+    }
+   	// 链表向后，直到结束或者达到100页
+    while(end && count < MAX_NUM_PAGES){
+      end = end->next;
+      count++;
+    }
+    if(end){ 
+      kmem[i].freelist = end->next;	// 后面还有空闲内存，freelist接在后面
+      end->next = 0;
+    }
+    else kmem[i].freelist = 0;
+    release(&kmem[i].lock);
+
+    acquire(&kmem[cpu].lock);
+    kmem[cpu].freelist = start->next;	// cpu的空闲内存freelist从start开始
+    release(&kmem[cpu].lock);
+    break;
+    
+  }
+  return (void*) start;
+}
 
 void
 kinit()
 {
-  initlock(&kmem.lock, "kmem");
+  char name[10];
+  for (int i = 0; i < NCPU; i++) {
+    snprintf(name, 10, "kmem-%d", i);
+    initlock(&kmem[i].lock, name);
+  }
   freerange(end, (void*)PHYSTOP);
 }
 
@@ -56,10 +99,14 @@ kfree(void *pa)
 
   r = (struct run*)pa;
 
-  acquire(&kmem.lock);
-  r->next = kmem.freelist;
-  kmem.freelist = r;
-  release(&kmem.lock);
+  push_off();
+  int cpu = cpuid();
+  pop_off();
+  // 空闲页加入对应CPU的空闲页链表
+  acquire(&kmem[cpu].lock);
+  r->next = kmem[cpu].freelist;
+  kmem[cpu].freelist = r;	// 维护链表（从头部插入）
+  release(&kmem[cpu].lock);
 }
 
 // Allocate one 4096-byte page of physical memory.
@@ -70,11 +117,18 @@ kalloc(void)
 {
   struct run *r;
 
-  acquire(&kmem.lock);
-  r = kmem.freelist;
+  push_off();
+  int cpu = cpuid();
+  pop_off();
+
+  acquire(&kmem[cpu].lock);
+  r = kmem[cpu].freelist;
+
   if(r)
-    kmem.freelist = r->next;
-  release(&kmem.lock);
+    kmem[cpu].freelist = r->next;
+  release(&kmem[cpu].lock);
+  if(r == 0)
+    r = get_others_pages(cpu);  // 【如果当前CPU的空闲页链表为空，到其他CPU的空闲页中取】
 
   if(r)
     memset((char*)r, 5, PGSIZE); // fill with junk
