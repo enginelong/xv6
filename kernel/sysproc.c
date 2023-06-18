@@ -67,9 +67,7 @@ sys_sleep(void)
     sleep(&ticks, &tickslock);
   }
   release(&tickslock);
-  
   backtrace();
-  
   return 0;
 }
 
@@ -95,6 +93,7 @@ sys_uptime(void)
   return xticks;
 }
 
+//new
 uint64
 sys_sigreturn(void)
 {
@@ -105,6 +104,7 @@ sys_sigreturn(void)
   return proc->trapframe->a0;
 }
 
+//new
 uint64
 sys_sigalarm(void)
 {

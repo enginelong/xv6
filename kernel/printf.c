@@ -134,16 +134,13 @@ printfinit(void)
   pr.locking = 1;
 }
 
+//new
 void
 backtrace(void)
 {
-  printf("backtrace:\n");
-  // fp保存当前栈帧指针
-  uint64 fp=r_fp();
-  while(fp!=PGROUNDUP(fp))
-  {
-    uint64 ret_addr=*(uint64 *)(fp-8);
-    printf("%p\n", ret_addr);
-    fp=*(uint64 *)(fp-16);
+  uint64 fp_address = r_fp();
+  while(fp_address != PGROUNDDOWN(fp_address)) {
+    printf("%p\n", *(uint64*)(fp_address-8));
+    fp_address = *(uint64*)(fp_address - 16);
   }
 }
