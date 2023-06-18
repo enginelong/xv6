@@ -10,7 +10,6 @@
 #define STACK_SIZE  8192
 #define MAX_THREAD  4
 
-
 struct Context{
   uint64 ra;
   uint64 sp;
@@ -35,7 +34,6 @@ struct thread {
   int        state;             /* FREE, RUNNING, RUNNABLE */
   struct Context ctx;
 };
-
 struct thread all_thread[MAX_THREAD];
 struct thread *current_thread;
 extern void thread_switch(uint64, uint64);
@@ -97,7 +95,6 @@ thread_create(void (*func)())
     if (t->state == FREE) break;
   }
   t->state = RUNNABLE;
-  
   // YOUR CODE HERE
   t->ctx.ra = (uint64) func;
   t->ctx.sp = (uint64) &t->stack + (STACK_SIZE - 1);

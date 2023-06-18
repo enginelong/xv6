@@ -77,18 +77,11 @@ main(int argc, char *argv[])
   tha = malloc(sizeof(pthread_t) * nthread);
   srandom(0);
 
-  printf("1 is OK...");
-
   barrier_init();
-
-  printf("2 is OK...");
 
   for(i = 0; i < nthread; i++) {
     assert(pthread_create(&tha[i], NULL, thread, (void *) i) == 0);
   }
-
-  printf("3 is OK...");
-
   for(i = 0; i < nthread; i++) {
     assert(pthread_join(tha[i], &value) == 0);
   }
