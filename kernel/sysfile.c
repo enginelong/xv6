@@ -316,8 +316,8 @@ static struct inode* follow_symlink(struct inode* ip) {
       return 0;
     }
     iunlockput(ip);
-
-    // get the inode of target path
+    
+    // get the inode of target path 
     if((ip = namei(target)) == 0) {
       printf("open_symlink: path \"%s\" is not exist\n", target);
       return 0;
@@ -416,7 +416,6 @@ sys_open(void)
 
   return fd;
 }
-
 
 uint64
 sys_mkdir(void)
@@ -551,7 +550,6 @@ sys_pipe(void)
   }
   return 0;
 }
-
 
 // my code
 uint64 sys_symlink(void) {
